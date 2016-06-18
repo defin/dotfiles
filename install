@@ -5,3 +5,4 @@ then cat >> ../.profile <<!
 
 source .df_bashrc
 !
+fi
