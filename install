@@ -1,0 +1,7 @@
+cp .df_bashrc .tmux.conf .tmux.df ..
+grep -s "source .df_bashrc" ../.profile > /dev/null 2>&1
+if [ ! $? ]
+then cat >> ../.profile <<!
+
+source .df_bashrc
+!
