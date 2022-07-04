@@ -1,0 +1,706 @@
+* Prelude
+#+begin_src emacs-lisp
+    (require 'cl-lib)
+
+    (cond ((string= window-system "ns")
+           (defvar which-emacs 'emacs-app))
+          ((string= window-system "x")
+           (defvar which-emacs 'x))
+          ((string= window-system "w32")
+           (defvar which-emacs 'w32))
+           ((eq window-system nil)
+           (defvar which-emacs 'tty)))
+#+end_src
+
+
+* Files & Paths
+#+begin_src emacs-lisp
+  (setq default-directory "~/")
+  (setq exec-path (append '("/Users/df/.poetry/bin" "/Users/df/Library/Python/3.9/bin" "/opt/local/bin") exec-path))  ;add-to-list
+  (setenv "PATH" (mapconcat 'identity exec-path ":"))
+  (setenv "PYTHONPATH" "/Users/df/Code/marmot/marmot")
+  (setenv "MYPYPATH" "/Users/df/Code/marmot/marmot")
+
+  (when (eq which-emacs 'emacs-app)
+    (setq desktop-dirname "~/.emacs.d/")
+    (desktop-save-mode 1))
+
+  ;(push (expand-file-name "~/.emacs.d/src") load-path)
+  ;(push (expand-file-name "~/.emacs.d/src/js2-mode") load-path)
+
+  (setq file-name-buffer-file-type-alist
+       '(("[:/].*config.sys$")
+         ("\\.\\(obj\\|exe\\|com\\|lib\\|sys\\|bin\\|ico\\|pif\\|class\\)$" . t)
+         ("\\.\\(dll\\|drv\\|386\\|vxd\\|fon\\|fnt\\|fot\\|ttf\\|grp\\)$" . t)
+         ("\\.\\(bmp\\|wav\\|avi\\|mpg\\|jpg\\|tif\\|mov\\|au\\)$" . t)
+         ("\\.\\(arc\\|zip\\|pak\\|lzh\\|zoo\\)$" . t)
+         ("\\.\\(a\\|o\\|tar\\|z\\|gz\\|taz\\|jar\\)$" . t)
+         ("\\.\\(php\\|tpl\\|css\\|html\\|js\\)$" . nil)
+         ("[:/]tags$")))
+
+  (filesets-init)
+
+  (setq version-control t
+        vc-make-backup-files t ; make backups of files even when they are under "vc"
+        kept-new-versions 16
+        kept-old-versions 0
+        delete-old-versions t
+        backup-by-copying-when-linked t
+        backup-by-copying t
+        auto-save-file-name-transforms '((".*" "~/.emacs.d/backups/" t))
+        backup-directory-alist '(("." . "~/.emacs.d/backups")))
+
+  (defun force-backup-of-buffer ()
+    (setq buffer-backed-up nil))
+
+  (add-hook 'before-save-hook  'force-backup-of-buffer)
+
+  ;; delete files not accessed in a week
+  (unless (eq which-emacs 'tty)
+    (message "Deleting old backup files...")
+    (let ((week (* 60 60 24 7))
+          (current (float-time (current-time))))
+      (dolist (file (directory-files "~/.emacs.d/backups" t))
+        (when (and (backup-file-name-p file)
+                   (> (- current (float-time (nth 4 (file-attributes file))))
+                      week))
+          (delete-file file)))))
+
+  (require 'package)
+  ;(add-to-list 'package-archives
+  ;             '("marmalade" . "http://marmalade-repo.org/packages/") t)
+
+  (add-to-list 'package-archives
+               '("melpa" . "http://melpa.org/packages/") t)
+
+  ;(add-to-list 'package-archives
+  ;             '("melpa-stable" . "http://stable.melpa.org/packages/") t)
+
+  ;(package-initialize)
+
+  (setq package-selected-packages '(magit))
+
+  (prefer-coding-system 'utf-8)
+#+end_src
+
+* UI
+** Keys
+#+begin_src emacs-lisp
+  (when (eq which-emacs 'emacs-app)
+    ; stop letting s-q (Command-Q) kill emacs
+    (global-set-key (kbd "s-q") '(lambda () (interactive)))
+    ; stop letting s-w (Command-W) close emacs window
+    (global-set-key (kbd "s-w") '(lambda () (interactive)))
+    ; stop letting C-x C-c kill emacs
+    (global-set-key (kbd "C-x C-c") '(lambda () (interactive)))
+    ; stop letting C-z minimize emacs
+    (global-set-key (kbd "C-z") '(lambda () (interactive))))
+
+  ;; make yes-or-no-p the same as y-or-n-p
+  (setf (symbol-function 'yes-or-no-p) (symbol-function 'y-or-n-p))
+
+
+  (defun keyboard-escape-quit-preserving-window-configuration ()
+    (interactive)
+    (let ((conf (current-window-configuration)))
+        (keyboard-escape-quit)
+        (set-window-configuration conf)))
+
+  (define-key global-map (kbd "ESC ESC ESC") 'keyboard-escape-quit-preserving-window-configuration)
+#+end_src
+
+** Display
+#+begin_src emacs-lisp
+  (when (eq which-emacs 'emacs-app)
+     (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+     (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+     (when (fboundp 'menu-bar-mode) (menu-bar-mode 1))
+     (require 'font-lock)
+     (setq font-lock-maximum-decoration t)
+     (global-font-lock-mode t)
+     (custom-set-variables
+       '(initial-frame-alist (quote ((fullscreen . maximized))))
+       '(default-frame-alist (quote ((fullscreen . maximized))))))
+     ;; (setq initial-frame-alist
+     ;;       `((top . 22)
+     ;;         (left . 0)
+     ;;         (width . ,(- (floor (display-pixel-width) (frame-char-width)) 4))
+     ;;         (height . ,(- (floor (- (display-pixel-height) 22) (frame-char-height)) 2)))))
+     ;; (setq default-frame-alist
+     ;;       `((top . 22)
+     ;;         (left . 0)
+     ;;         (width . ,(- (floor (display-pixel-width) (frame-char-width)) 4))
+     ;;         (height . ,(- (floor (- (display-pixel-height) 22) (frame-char-height)) 2))))
+
+  (when (eq which-emacs 'tty)
+     (when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
+     (xterm-mouse-mode))
+
+  (put 'narrow-to-region 'disabled nil)
+
+  (column-number-mode 1)
+  (transient-mark-mode 1)
+
+  (setq inhibit-startup-echo-area-message t)
+  (setq inhibit-startup-message t)
+
+  (setq visible-bell t)
+#+end_src
+
+** Solarized
+
+#+begin_src emacs-lisp
+  (use-package solarized-theme
+    :ensure t
+    :config
+    (load-theme 'solarized-dark t))
+#+end_src
+
+** IDO
+#+begin_src emacs-lisp
+; Use IDO for buffer completion
+;(setq ido-everywhere t)
+;(ido-mode 'buffers) ; 'both turns on directories too but its buggy
+#+end_src
+
+
+* Programming
+#+begin_src emacs-lisp
+  (setq default-tab-width 4)
+  (setq-default indent-tabs-mode nil)
+
+  ; html-helper-mode sux, use xml-mode...
+  (while (let ((e (rassoc 'html-helper-mode auto-mode-alist)))
+           (when e
+             (rplacd e 'xml-mode))))
+
+  (c-add-style "my-js"
+               '("bsd"
+                 (c-basic-offset . 2)
+                 (c-comment-only-line-offset . 0)
+                 (c-offsets-alist
+                  (statement-block-intro . +)
+                  (knr-argdecl-intro . +)
+                  (substatement-open . 0)
+                  (label . 0)
+                  (statement-cont . +)
+                  (inline-open . 0)
+                  (inexpr-class . 0))))
+
+  (add-hook 'javascript-mode-hook
+            (lambda ()
+              (c-set-style "my-js"))
+            nil nil)
+
+  ;(autoload 'js2-mode "js2-mode" nil t)
+  ;(add-to-list 'auto-mode-alist '("\\.js$" . js2-mode))
+  (add-to-list 'auto-mode-alist '("\\.jsx?$" . web-mode)) ;; auto-enable for .js/.jsx files
+  (setq web-mode-content-types-alist '(("jsx" . "\\.js[x]?\\'")))
+
+  (add-to-list 'auto-mode-alist '("~/Code/marmot/web/.*\\.js[x]?\\'" . web-mode))
+
+  (setq web-mode-enable-engine-detection t)
+
+  (defun web-mode-init-hook ()
+    "Hooks for Web mode.  Adjust indent."
+    (setq web-mode-markup-indent-offset 2)
+    (setq web-mode-css-indent-offset 2)
+    (setq web-mode-code-indent-offset 2)
+    (setq web-mode-enable-auto-pairing t)
+    (setq web-mode-enable-auto-closing t)
+    (setq web-mode-enable-auto-quoting nil)
+    (setq web-mode-enable-block-face t)
+    (setq web-mode-enable-current-element-highlight t)
+    (setq web-mode-enable-current-column-highlight t))
+
+  (add-hook 'web-mode-hook  'web-mode-init-hook)
+
+
+  ;(defun web-mode-init-prettier-hook ()
+  ;  (add-node-modules-path)
+  ;  (prettier-js-mode))
+
+  ;(add-hook 'web-mode-hook  'web-mode-init-prettier-hook)
+
+  (add-hook 'web-mode-hook  'emmet-mode)
+  ; directions on es6 from:
+  ; https://gist.github.com/CodyReichert/9dbc8bd2a104780b64891d8736682cea
+
+  (defun delete-trailing-newlines ()
+    (interactive)
+    (save-restriction
+      (widen)
+      (save-excursion
+        (if (and (> (point-max) (point-min))
+                 (not find-file-literally))
+            (while (or (= (char-after (1- (point-max))) ?\n)
+                       (= (char-after (1- (point-max))) ?\r))
+              (goto-char (point-max))
+              (delete-backward-char 1))))))
+
+  (add-hook 'before-save-hook
+            (lambda ()
+              (delete-trailing-whitespace)))
+
+;  (add-hook 'before-save-hook
+;            (lambda ()
+;              (if (eq major-mode 'php-mode)
+;                  (delete-trailing-newlines))))
+
+;  (defun untabify-with-extreme-prejudice ()
+;    (save-restriction
+;      (widen)
+;      (untabify (point-min) (point-max))))
+
+;  (add-hook 'before-save-hook
+;            (lambda ()
+;              (if (eq major-mode 'python-mode)
+;                  (untabify-with-extreme-prejudice))))
+#+end_src
+
+** Flycheck
+#+begin_src emacs-lisp
+  (setq python-shell-interpreter "/opt/local/bin/python3")
+
+  (use-package flycheck
+    :ensure t
+    :config
+    (global-flycheck-mode t)
+    ;; note that these bindings are optional
+                                          ;  (global-set-key (kbd "C-c n") 'flycheck-next-error)
+    ;; this might override a default binding for running a python process,
+    ;; see comments below this answer
+                                          ;  (global-set-key (kbd "C-c p") 'flycheck-prev-error)
+    )
+
+  (use-package flycheck-pycheckers
+    :after flycheck
+    :ensure t
+    :init
+    (with-eval-after-load 'flycheck
+      (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup))
+    (setq flycheck-pycheckers-checkers
+          '(mypy3))) ;  pyflakes
+
+  (use-package flycheck
+    :ensure t
+    :config
+    (require 'flycheck)
+    (setq-default flycheck-disabled-checkers
+                  (append flycheck-disabled-checkers
+                          '(javascript-jshint json-jsonlist flake8)))
+
+    ;; Enable eslint checker for web-mode
+    (flycheck-add-mode 'javascript-eslint 'web-mode)
+    ;; Enable flycheck globally
+    (add-hook 'after-init-hook #'global-flycheck-mode)
+
+    (add-hook 'flycheck-mode-hook 'add-node-modules-path)
+
+                                          ;(defvaralias 'flycheck-python-flake8-executable 'python-shell-interpreter)
+                                          ;(defvaralias 'flycheck-python-pycompile-executable 'python-shell-interpreter)
+                                          ;(defvaralias 'flycheck-python-pylint-executable 'python-shell-interpreter)
+
+                                          ;(setq flycheck-pycheckers-max-line-length 99)
+    (custom-set-variables '(flycheck-pycheckers-checkers '(pylint mypy3) t)) ; flake8
+
+    (global-flycheck-mode 1)
+    (with-eval-after-load 'flycheck
+      (add-hook 'flycheck-mode-hook #'flycheck-pycheckers-setup)))
+#+end_src
+** Language-independent
+#+begin_src emacs-lisp
+  (use-package yaml-mode
+    :ensure t)
+
+  (use-package magit
+    :ensure t)
+
+  (use-package emmet-mode
+    :ensure t)
+
+  (use-package projectile
+    :ensure t
+    :config
+    (projectile-mode +1)
+    (define-key projectile-mode-map (kbd "s-p") 'projectile-command-map)
+    (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map))
+#+end_src
+
+** Python
+#+begin_src emacs-lisp
+  (use-package poetry
+    :ensure t
+    :config
+    (setq poetry-tracking-strategy 'switch-buffer)) ; 'projectile
+
+  (use-package elpy
+    :after poetry
+    :ensure t
+    :config
+    (elpy-enable)
+    (add-hook 'elpy-mode-hook 'poetry-tracking-mode) ;; optional if you're using Poetry
+    (setq elpy-rpc-virtualenv-path 'current)
+    (setq elpy-syntax-check-command "~/.pyenv/shims/pyflakes") ;; or replace with the path to your pyflakes binary
+    ;; allows Elpy to see virtualenv
+    (add-hook 'elpy-mode-hook
+              ;; pyvenv-mode
+              '(lambda ()
+                 (pyvenv-mode +1)))
+    ;; use flycheck instead of flymake
+    (when (load "flycheck" t t)
+      (setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
+      (add-hook 'elpy-mode-hook 'flycheck-mode))
+    (add-hook 'elpy-mode-hook (lambda ()
+                                (add-hook 'before-save-hook
+                                          'elpy-black-fix-code nil t))))
+#+end_src
+
+** Lisp
+#+begin_src emacs-lisp
+;(add-to-list 'load-path (expand-file-name "~/lib/slime"))
+;(require 'slime-autoloads)
+
+(eval-after-load "slime"
+  '(progn
+    (add-to-list 'load-path "/Users/df/lib/slime")
+    (slime-setup '(slime-fancy slime-banner))
+
+    (load "~/lib/quicklisp/log4slime-setup.el")
+    (global-log4slime-mode 1)
+
+    (setq slime-complete-symbol*-fancy t)
+    (setq slime-complete-symbol-function 'slime-fuzzy-complete-symbol)
+    (setq slime-net-coding-system 'utf-8-unix)))
+
+;(setq inferior-lisp-program "/Users/df/lib/AllegroCL64-8/alisp") ; not for slime
+#+end_src
+
+
+* Org Mode
+** Setup
+#+begin_src emacs-lisp
+(add-to-list 'auto-mode-alist '("\\.\\(org\\|org_archive\\)$" . org-mode))
+
+(setq org-directory "~/org")
+(setq org-default-notes-file (concat org-directory "/refile.org"))
+(setq org-log-done t)
+
+(setq org-use-fast-todo-selection t)
+
+(setq org-completion-use-ido t)
+
+(defun gtd ()
+   (interactive)
+   (find-file "~/org/gtd.org"))
+#+end_src
+
+** Keys
+#+begin_src emacs-lisp
+  (define-prefix-command 'org-custom-map)
+  (global-set-key (kbd "M-`") 'org-custom-map)
+  (global-set-key (kbd "M-` a") 'org-agenda)
+  (global-set-key (kbd "M-` b") 'org-iswitchb)
+  (global-set-key (kbd "M-` c") 'org-capture)
+  (global-set-key (kbd "M-` d") 'org-decrypt-entry)
+  (global-set-key (kbd "M-` e") 'org-encrypt-entry)
+  (global-set-key (kbd "M-` g") 'org-mobile-pull)
+  (global-set-key (kbd "M-` l") 'org-store-link)
+  (global-set-key (kbd "M-` p") 'org-mobile-push)
+  (global-set-key (kbd "M-` t") 'bh/org-todo)
+  (global-set-key (kbd "M-` w") 'bh/widen)
+
+  ;; Clocking
+  (define-prefix-command 'org-custom-clock-map)
+  (global-set-key (kbd "M-` M-c") 'org-custom-map)
+  (global-set-key (kbd "M-` M-c i") 'bh/punch-in)
+  (global-set-key (kbd "M-` M-c o") 'bh/punch-out)
+  (global-set-key (kbd "M-` M-c SPC") 'bh/clock-in-last-task)
+  (global-set-key (kbd "M-` M-c g") 'org-clock-goto)
+  (global-set-key (kbd "M-` M-c n") 'org-clock-in)
+#+end_src
+
+** Org Agenda
+#+begin_src emacs-lisp
+(setq org-agenda-files '("~/org/"))
+
+(defun air-org-skip-subtree-if-priority (priority)
+  "Skip an agenda subtree if it has a priority of PRIORITY.
+
+PRIORITY may be one of the characters ?A, ?B, or ?C."
+  (let ((subtree-end (save-excursion (org-end-of-subtree t)))
+        (pri-value (* 1000 (- org-lowest-priority priority)))
+        (pri-current (org-get-priority (thing-at-point 'line t))))
+    (if (= pri-value pri-current)
+        subtree-end
+      nil)))
+
+(defun air-org-skip-subtree-if-habit ()
+  "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
+  (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+    (if (string= (org-entry-get nil "STYLE") "habit")
+        subtree-end
+      nil)))
+
+(setq org-agenda-custom-commands
+      '(("d" "Daily agenda and all TODOs"
+         ((tags "PRIORITY=\"A\""
+                ((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+                 (org-agenda-overriding-header "High-priority unfinished tasks:")))
+          (agenda "" ((org-agenda-ndays 1)))
+          (alltodo ""
+                   ((org-agenda-skip-function '(or (air-org-skip-subtree-if-habit)
+                                                   (air-org-skip-subtree-if-priority ?A)
+                                                   (org-agenda-skip-if nil '(scheduled deadline))))
+                    (org-agenda-overriding-header "ALL normal priority tasks:"))))
+         ((org-agenda-compact-blocks nil)))))
+
+#+end_src
+
+** Org Capture
+#+begin_src emacs-lisp
+(setq org-capture-templates
+      '(("t" "todo" entry (file "~/org/refile.org")
+         "* TODO %?\n%U\n%a\n  %i" :clock-in t :clock-resume t)
+        ("n" "note" entry (file "~/org/refile.org")
+         "* %? :NOTE:\n%U\n%a\n  %i" :clock-in t :clock-resume t)
+        ("j" "Journal" entry (file+datetree "~/org/journal.org")
+         "* %?\n%U\n  %i" :clock-in t :clock-resume t)
+        ;;("w" "org-protocol" entry (file "~/org/refile.org")
+        ;;"* TODO Review %c\n%U\n  %i" :immediate-finish t)
+        ("w" "org-protocol" entry (file+headline "~/org/refile.org" "Web")
+         "* %c\n  %u\n  %i"
+         :empty-lines 1 :immediate-finish t)
+        ("h" "Habit" entry (file "~/org/refile.org")
+         "* NEXT %?\n%U\n%a\nSCHEDULED: %t .+1d/3d\n:PROPERTIES:\n:STYLE: habit\n:REPEAT_TO_STATE: NEXT\n:END:\n  %i")
+        ("Q" "org-protocol" entry (file+headline "~/org/refile.org"
+         "Notes") "* %:link\n  %U"
+         :immediate-finish t :clock-in t :clock-resume t :empty-lines 1)
+))
+#+end_src
+
+** Org Speed
+#+begin_src emacs-lisp
+(setq org-use-speed-commands t)
+(setq org-speed-commands-user (quote (("h" . hide-other)
+                                      ("k" . org-kill-note-or-show-branches)
+;                                      ("q" . bh/show-org-agenda)
+                                      ("r" . org-reveal)
+                                      ("s" . org-save-all-org-buffers)
+                                      ("z" . org-add-note)
+;                                      ("c" . self-insert-command)
+;                                      ("C" . self-insert-command)
+                                      ("J" . org-clock-goto))))
+
+#+end_src
+
+** Org Babel
+http://orgmode.org/worg/org-contrib/babel/intro.html
+#+begin_src emacs-lisp
+(setq org-ditaa-jar-path "~/.emacs.d/src/java/ditaa.jar")
+(setq org-plantuml-jar-path "~/.emacs.d/src/java/plantuml.jar")
+
+(add-hook 'org-babel-after-execute-hook 'org-display-inline-images 'append)
+
+(org-babel-do-load-languages
+  'org-babel-load-languages
+  '((emacs-lisp . t)
+    (dot . t)
+    (ditaa . t)
+    (R . t)
+    (python . t)
+    (ruby . nil)
+    (gnuplot . t)
+    (clojure . nil)
+    (shell . t)
+    (ledger . t)
+    (org . t)
+    (plantuml . t)
+    (latex . t)))
+
+(setq org-confirm-babel-evaluate nil)
+
+#+end_src
+
+** Org Protocol
+#+begin_src emacs-lisp
+(when (eq which-emacs 'emacs-app)
+  ; (setq server-socket-dir "/tmp/emacs501o")
+    (server-start)
+  ; (server-force-delete) to clear
+    (require 'org-protocol))
+#+end_src
+
+
+** OrgMobile
+#+begin_src emacs-lisp
+  ;(setq org-mobile-inbox-for-pull "~/org/inbox.org")
+  ;(setq org-mobile-directory "~/org/MobileOrg")
+  ;(setq org-mobile-files '(org-agenda-files org-agenda-text-search-extra-files "~/org/"))
+#+end_src
+*** OrgMobile Mercurial
+#+begin_src emacs-lisp
+  ; add these lines into customize of mode-line-format
+  ;(org-local-modified-p "|>")
+  ;(org-mobile-modified-p "<|")
+
+   (defadvice org-mobile-push (after mercurial-push last () activate)
+     (interactive)
+     (shell-command "cd ~/org;hg commit -m 'push';hg push")
+     (org-mobile-check-modified-local))
+
+   (defadvice org-mobile-pull (before mercurial-pull first () activate)
+     (interactive)
+     (shell-command "cd ~/org;hg pull;hg update"))
+
+   (defadvice org-mobile-pull (after mercurial-pull-after last () activate)
+     (interactive)
+     (shell-command "cd ~/org;hg commit -m 'pull';hg push")
+     (org-mobile-check-modified)
+     (find-file "~/org/inbox.org"))
+
+    (defvar org-mobile-modified-p nil)
+    (defvar org-local-modified-p nil)
+
+    (defun org-mobile-check-modified ()
+      (let* ((buf (get-buffer-create "*hg-check*"))
+             (proc (start-process-shell-command "ssh hg status" buf
+                     "ssh -i ~/test.pem ubuntu@cloud-23.dyndns.org 'cd org;hg status';echo '@@'")))
+        (set-process-filter proc (lambda (process output)
+                                  (if (string= "@@\n" output)
+                                       (setq org-mobile-modified-p nil)
+                                     (setq org-mobile-modified-p t))))))
+
+    (defun org-mobile-check-modified-local ()
+      (let* ((buf (get-buffer-create "*hg-check*"))
+             (proc (start-process-shell-command "local hg status" buf
+                     "cd ~/org;hg status;echo '@@'")))
+        (set-process-filter proc (lambda (process output)
+                                   (if (string= "@@\n" output)
+                                       (setq org-local-modified-p nil)
+                                     (setq org-local-modified-p t))))))
+
+   (defun org-mobile-check-modified-timer ()
+      (run-at-time "10 min" nil (lambda ()
+                                 (org-mobile-check-modified)
+                                 (org-mobile-check-modified-local)
+                                 (org-mobile-check-modified-timer))))
+
+    ;(org-mobile-check-modified-timer)
+#+end_src
+
+** Org Crypt
+#+begin_src emacs-lisp
+(require 'epa-file)
+(epa-file-enable)
+(require 'org-crypt)
+(org-crypt-use-before-save-magic)
+(setq org-tags-exclude-from-inheritance (quote ("crypt")))
+;; GPG key to use for encryption
+;; Either the Key ID or set to nil to use symmetric encryption.
+(setq org-crypt-key nil)
+#+end_src
+
+#+results:
+
+** Orgxy
+
+* Utility Code
+** Tidy
+#+begin_src emacs-lisp
+  (defun tidyxml ()
+    (interactive)
+    (shell-command-on-region (point-min) (point-max) "xmllint --c14n - | XMLLINT_INDENT=$'\t' xmllint --format -" nil t))
+
+  (defun tidyjson ()
+    (interactive)
+    (shell-command-on-region (point-min) (point-max) "python -c 'import sys, json; print json.dumps(json.load(sys.stdin), sort_keys=True, indent=4)'" nil t))
+
+  (defun tidydict ()
+    (interactive)
+    (shell-command-on-region (point-min) (point-max) "python -c 'import sys, json; print json.dumps(sys.stdin.read(), sort_keys=True, indent=4)'" nil t))
+
+  (defun tidyphp ()
+    (interactive)
+    (shell-command-on-region (point-min) (point-max) "php -r 'print_r(unserialize(file_get_contents(\"php://stdin\")));'" nil t))
+
+  (defun tidyjavascript ()
+    (interactive)
+    (shell-command-on-region (point-min) (point-max) "python -c 'import sys, jsbeautifier; print jsbeautifier.beautify(sys.stdin.read())'" nil t))
+
+#+end_src
+** Helpers
+#+begin_src emacs-lisp
+  (defun duckduckgo-search (text)
+    "Search DuckDuckGo from Emacs."
+    (interactive "sSearch: ")
+    (browse-url
+     (concat "https://duckduckgo.com/?q="
+             (replace-regexp-in-string " " "+" text))))
+#+end_src
+** Auto commit
+#+begin_src emacs-lisp
+  ;;; Auto commit
+  (make-variable-buffer-local 'auto-commit)
+  (setq auto-commit nil)
+  (push (cons 'auto-commit t) safe-local-variable-values)
+
+  (defun vc-auto-commit ()
+    (interactive)
+    (when auto-commit
+      (let ((file (buffer-file-name)))
+        (unless (vc-registered file)
+          (vc-register))
+        (vc-checkin (list file) (vc-backend file) nil "Auto Commit"))))
+
+  (add-hook 'after-save-hook (lambda () (vc-auto-commit)))
+
+  ;; * 17 * * * (cd /Users/dfinster/Code/s/vhub/org; hg push)
+
+  ;;; VC config
+  (require 'vc)
+  (setq vc-handled-backends '(Hg Git SVN))
+#+end_src
+** Rename/Move files and and buffers together
+#+begin_src emacs-lisp
+  ;; via yegge
+  (defun rename-file-and-buffer (new-name)
+    "Renames both current buffer and file it's visiting to NEW-NAME."
+    (interactive "sNew name: ")
+    (let ((name (buffer-name))
+          (filename (buffer-file-name)))
+      (if (not filename)
+          (message "Buffer '%s' is not visiting a file!" name)
+        (if (get-buffer new-name)
+            (message "A buffer named '%s' already exists!" new-name)
+          (progn
+            (rename-file name new-name 1)
+            (rename-buffer new-name)
+            (set-visited-file-name new-name)
+            (set-buffer-modified-p nil))))))
+
+  ;; via yegge
+  (defun move-buffer-file (dir)
+    "Moves both current buffer and file it's visiting to DIR."
+    (interactive "DNew directory: ")
+    (let* ((name (buffer-name))
+           (filename (buffer-file-name))
+           (dir
+            (if (string-match dir "\\(?:/\\|\\\\)$")
+                (substring dir 0 -1) dir))
+           (newname (concat dir "/" name)))
+
+      (if (not filename)
+          (message "Buffer '%s' is not visiting a file!" name)
+        (progn
+          (copy-file filename newname 1)
+          (delete-file filename)
+          (set-visited-file-name newname)
+          (set-buffer-modified-p nil)
+          t))))
+#+end_src
+* Custom
+#+begin_src emacs-lisp
+  (setq custom-file "~/.emacs.d/emacs-custom.el")
+  (load custom-file)
+#+end_src

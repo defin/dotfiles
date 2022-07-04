@@ -1,0 +1,14 @@
+.emacs.d/*.elc
+.emacs.d/*~
+.emacs.d/.emacs.desktop
+.emacs.d/.emacs.desktop.lock
+.emacs.d/.org-id-locations
+.emacs.d/_emacs.el
+.emacs.d/auto-save-list
+.emacs.d/backups
+.emacs.d/df.el
+.emacs.d/df.org
+.emacs.d/filesets-cache.el
+.emacs.d/org-clock-save.el
+.emacs.d/passwords.el
+.git
